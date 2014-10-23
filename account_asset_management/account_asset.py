@@ -1564,16 +1564,16 @@ class account_asset_depreciation_line(orm.Model):
             partner_id = asset.partner_id.id
             depr_acc_id = asset.category_id.account_depreciation_id.id
             exp_acc_id = asset.category_id.account_expense_depreciation_id.id
+            ctx = dict(context, allow_asset=True)
             move_line_obj.create(cr, uid, self._setup_move_line_data(
                 line, depreciation_date, period_ids, depr_acc_id,
-                'depreciation', context),
-                context=context.update({'allow_asset': True}))
+                'depreciation', move_id, context), ctx)
             move_line_obj.create(cr, uid, self._setup_move_line_data(
                 line, depreciation_date, period_ids, exp_acc_id, 'expense',
-                context), context=context.update({'allow_asset': True}))
+                move_id, context), ctx)
             self.write(
                 cr, uid, line.id, {'move_id': move_id},
-                context=context.update({'allow_asset_line_update': True}))
+                context=dict(context, allow_asset_line_update=True))
             created_move_ids.append(move_id)
             asset_ids.append(asset.id)
         # we re-evaluate the assets to determine whether we can close them
@@ -1599,15 +1599,16 @@ class account_asset_depreciation_line(orm.Model):
         return move_data
 
     def _setup_move_line_data(self, depreciation_line, depreciation_date,
-                              period_ids, account_id, type, context):
+                              period_ids, account_id, type, move_id, context):
         asset = depreciation_line.asset_id
+        amount = depreciation_line.amount
         analytic_id = False
         if type == 'depreciation':
-            debit = line.amount < 0 and -line.amount or 0.0
-            credit = line.amount > 0 and line.amount or 0.0
+            debit = amount < 0 and -amount or 0.0
+            credit = amount > 0 and amount or 0.0
         elif type == 'expense':
-            debit = line.amount > 0 and line.amount or 0.0
-            credit = line.amount < 0 and -line.amount or 0.0
+            debit = amount > 0 and amount or 0.0
+            credit = amount < 0 and -amount or 0.0
             analytic_id = asset.category_id.account_analytic_id.id
         move_line_data = {
             'name': asset.name,
@@ -1616,7 +1617,7 @@ class account_asset_depreciation_line(orm.Model):
             'account_id': account_id,
             'credit': credit,
             'debit': debit,
-            'period_id': period_ids
+            'period_id': period_ids,
             'journal_id': asset.category_id.journal_id.id,
             'partner_id': asset.partner_id.id,
             'analytic_account_id': analytic_id,
